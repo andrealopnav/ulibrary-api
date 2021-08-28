@@ -13,12 +13,36 @@ router.get("/api/books", auth, async(req, res) => {
 		if(req.user.role == 'student' || req.user.role == 'librarian') {
 			const booksCollection = connection.db.collection("books");
 
-		    booksCollection.find({}).toArray((error, result) => {
+		    booksCollection.find({}).toArray((error, results) => {
 		        if(error) {
 		            return res.status(500).send(error);
 		        }
-		        res.send(result);
-		    });	
+		        var newresults = [];
+
+		        for(i=0;i<results.length;i++){
+		        	const stock = new Object(results[i].stock);
+		        	var available = 0;
+
+		        	for(j=0;j<stock.length;j++){
+		        		if (stock[j].status == 'available') {
+		        			available++;
+		        		}
+		        	}
+
+		        	newresults.push({
+		        		id: results[i]._id,
+			        	title: results[i].title,
+			        	author: results[i].author,
+			        	published_year: results[i].published_year,
+			        	genre: results[i].genre,
+			        	stock: available == 0 ? 0 : stock.length,
+			        	available: available
+		        	});
+            	}
+
+		        res.send(newresults);
+		    });
+
 		} else {
 			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
 		}
