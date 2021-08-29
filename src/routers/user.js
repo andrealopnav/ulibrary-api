@@ -6,7 +6,7 @@ const auth = require('../middleware/auth')
 const router = express.Router()
 
 // Create a new user
-router.post('/api/user', async (req, res) => {
+router.post('/api/user', auth, async (req, res) => {
     try {
         if(req.user.role == 'librarian') {
             const user = new User(req.body)

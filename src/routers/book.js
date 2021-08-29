@@ -35,7 +35,8 @@ router.get("/api/books", auth, async(req, res) => {
 			        	author: results[i].author,
 			        	published_year: results[i].published_year,
 			        	genre: results[i].genre,
-			        	stock: available == 0 ? 0 : stock.length,
+			        	stock: results[i].stock,
+			        	stock_qty: available == 0 ? 0 : stock.length,
 			        	available: available
 		        	});
             	}
@@ -78,29 +79,129 @@ router.post("/api/book", auth, async(req, res) => {
     }
 });
 
-// Update stock status
-router.patch("/api/book/:bookId/:stockId", auth, async(req, res) => {
+// List of stock in book
+router.get("/api/book/stock", auth, async(req, res) => {
 	try {
 		if(req.user.role == 'student' || req.user.role == 'librarian') {
 			const booksCollection = connection.db.collection("books");
-			
-			const myquery = { 
-				'_id': mongoose.Types.ObjectId(req.params.bookId),
-				'stock._id': mongoose.Types.ObjectId(req.params.stockId)
-			};
-			
-			var newvalues = { 
-				$set: { 
-					'stock.$.status': req.body.status 
-				}
-			};
+			const bookId = mongoose.Types.ObjectId(req.body.book_id);
 
-		    booksCollection.updateOne(myquery, newvalues, (error, result) => {
+		    booksCollection.findOne({_id: bookId}, (error, result) => {
 		        if(error) {
 		            return res.status(500).send(error);
 		        }
-		        res.send(result);
+		        
+		        const stock = new Object(result.stock);
+		        var available = 0;
+
+		        for(i=0;i<stock.length;i++){
+		        	if (stock[i].status == 'available') {
+		        		available++;
+		        	}
+		        }
+
+		        const newresult = {
+		        	id: result._id,
+			       	title: result.title,
+			       	author: result.author,
+			       	stock: result.stock,
+			       	stockqty: available == 0 ? 0 : stock.length,
+			       	available: available
+		        };
+
+		        res.send(newresult);
 		    });
+
+		} else {
+			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+		}
+	} catch (error) {
+        res.status(400).send(error)
+    }
+});
+
+// Update stock status
+router.patch("/api/book/stock", auth, async(req, res) => {
+	try {
+		if(req.user.role == 'student' || req.user.role == 'librarian') {
+			const booksCollection = connection.db.collection("books");
+			const stockCollection = connection.db.collection("stock");
+			var status = req.body.status;
+
+			if (status == 'returned') {
+				const myquery1 = { 
+					'_id': mongoose.Types.ObjectId(req.body.hist_id)
+				};
+			
+				var newvalues1 = { 
+					$set: { 
+						'status': status 
+					}
+				};
+
+				stockCollection.updateOne(myquery1, newvalues1, (error, result) => {
+			    	if(error) {
+			        	return res.status(500).send(error);
+			    	}
+				});	
+
+				status = 'available';		
+
+			} else {
+				const stock = {
+					book_id: req.body.book_id,
+					stock_id: req.body.stock_id,
+					user_id: req.body.user_id,
+					status: status,
+					date: new Date()
+				};
+
+			    stockCollection.insertOne(stock, (error, result) => {
+			        if(error) {
+			            return res.status(500).send(error);
+			        }
+			    });
+			}
+
+		    const myquery2 = { 
+				'_id': mongoose.Types.ObjectId(req.body.book_id),
+				'stock._id': mongoose.Types.ObjectId(req.body.stock_id)
+			};
+			
+			var newvalues2 = { 
+				$set: { 
+					'stock.$.status': status 
+				}
+			};
+
+			booksCollection.updateOne(myquery2, newvalues2, (error, result) => {
+			    if(error) {
+			        return res.status(500).send(error);
+			    }
+			    res.send(result);
+			});
+			
+		} else {
+			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+		}
+	} catch (error) {
+        res.status(400).send(error)
+    }
+});
+
+// List of reservation/rents - user
+router.get("/api/book/re/user", auth, async(req, res) => {
+	try {
+		if(req.user.role == 'student' || req.user.role == 'librarian') {
+			const stockCollection = connection.db.collection("stock");
+			
+			stockCollection.find({user_id: req.body.user_id}).toArray((error, results) => {
+		        if(error) {
+		            return res.status(500).send(error);
+		        }
+		        res.send(results);
+		    });
+
 		} else {
 			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
 		}
