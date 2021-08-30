@@ -12,11 +12,24 @@ router.get("/api/books", auth, async(req, res) => {
 	try {
 		if(req.user.role == 'student' || req.user.role == 'librarian') {
 			const booksCollection = connection.db.collection("books");
+			var filters = {};
 
-		    booksCollection.find({}).toArray((error, results) => {
+			if (req.body.hasOwnProperty('title'))
+    			filters.title = req.body.title;
+			
+			if (req.body.hasOwnProperty('author'))
+    			filters.author = req.body.author;
+
+    		if (req.body.hasOwnProperty('genre'))
+    			filters.genre = req.body.genre;
+
+    		const query = {...filters}
+
+		    booksCollection.find(query).toArray((error, results) => {
 		        if(error) {
-		            return res.status(500).send(error);
+		            res.json({code: 500, error: error});
 		        }
+
 		        var newresults = [];
 
 		        for(i=0;i<results.length;i++){
@@ -41,14 +54,14 @@ router.get("/api/books", auth, async(req, res) => {
 		        	});
             	}
 
-		        res.send(newresults);
+            	res.json({code: 200, result: newresults});
 		    });
 
 		} else {
-			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
 		}
 	} catch (error) {
-        res.status(400).send(error)
+        res.json({code: 400, error: error});
     }
 });
 
@@ -67,15 +80,15 @@ router.post("/api/book", auth, async(req, res) => {
 
 		    booksCollection.insertOne(book, (error, result) => {
 		        if(error) {
-		            return res.status(500).send(error);
+		            res.json({code: 500, error: error});
 		        }
-		        res.send(result);
+		        res.json({code: 200, result: result});
 		    });
 		} else {
-			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
 		}
 	} catch (error) {
-        res.status(400).send(error)
+        res.json({code: 400, error: error});
     }
 });
 
@@ -88,7 +101,7 @@ router.get("/api/book/stock", auth, async(req, res) => {
 
 		    booksCollection.findOne({_id: bookId}, (error, result) => {
 		        if(error) {
-		            return res.status(500).send(error);
+		            res.json({code: 500, error: error});
 		        }
 		        
 		        const stock = new Object(result.stock);
@@ -109,14 +122,14 @@ router.get("/api/book/stock", auth, async(req, res) => {
 			       	available: available
 		        };
 
-		        res.send(newresult);
+		        res.json({code: 200, result: newresult});
 		    });
 
 		} else {
-			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
 		}
 	} catch (error) {
-        res.status(400).send(error)
+        res.json({code: 400, error: error});
     }
 });
 
@@ -141,7 +154,7 @@ router.patch("/api/book/stock", auth, async(req, res) => {
 
 				stockCollection.updateOne(myquery1, newvalues1, (error, result) => {
 			    	if(error) {
-			        	return res.status(500).send(error);
+			        	res.json({code: 500, error: error});
 			    	}
 				});	
 
@@ -150,15 +163,17 @@ router.patch("/api/book/stock", auth, async(req, res) => {
 			} else {
 				const stock = {
 					book_id: req.body.book_id,
+					book_info: req.body.book_info,
 					stock_id: req.body.stock_id,
 					user_id: req.body.user_id,
+					user_name: req.body.user_name,
 					status: status,
 					date: new Date()
 				};
 
 			    stockCollection.insertOne(stock, (error, result) => {
 			        if(error) {
-			            return res.status(500).send(error);
+			            res.json({code: 500, error: error});
 			        }
 			    });
 			}
@@ -178,35 +193,58 @@ router.patch("/api/book/stock", auth, async(req, res) => {
 			    if(error) {
 			        return res.status(500).send(error);
 			    }
-			    res.send(result);
+			    res.json({code: 200, result: result});
 			});
 			
 		} else {
-			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
 		}
 	} catch (error) {
-        res.status(400).send(error)
+        res.json({code: 400, error: error});
     }
 });
 
 // List of reservation/rents - user
-router.get("/api/book/re/user", auth, async(req, res) => {
+router.post("/api/book/re/user", auth, async(req, res) => {
 	try {
 		if(req.user.role == 'student' || req.user.role == 'librarian') {
 			const stockCollection = connection.db.collection("stock");
 			
 			stockCollection.find({user_id: req.body.user_id}).toArray((error, results) => {
 		        if(error) {
-		            return res.status(500).send(error);
+		            res.json({code: 500, error: error});
 		        }
-		        res.send(results);
-		    });
+		        
+            	res.json({code: 200, result: results});
+		    });            	
 
 		} else {
-			return res.status(403).send({error: 'Access to the requested resource is forbidden!'})
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
 		}
 	} catch (error) {
-        res.status(400).send(error)
+        res.json({code: 400, error: error});
+    }
+});
+
+// List of all reservation/rents
+router.get("/api/book/re/all", auth, async(req, res) => {
+	try {
+		if(req.user.role == 'librarian') {
+			const stockCollection = connection.db.collection("stock");
+			
+			stockCollection.find({}).toArray((error, results) => {
+		        if(error) {
+		            res.json({code: 500, error: error});
+		        }
+		        
+            	res.json({code: 200, result: results});
+		    });            	
+
+		} else {
+			res.json({code: 403, error: 'Access to the requested resource is forbidden!'});
+		}
+	} catch (error) {
+        res.json({code: 400, error: error});
     }
 });
 
